@@ -8,10 +8,10 @@ function getApiBase(): string {
   if (typeof window !== 'undefined') {
     const host = window.location.hostname
     if (host.endsWith('.ts.net') || host === 'localhost' || host === '127.0.0.1') {
-      return ''
+      return '/api'
     }
   }
-  return 'http://localhost:8787'
+  return 'http://localhost:8787/api'
 }
 
 const API_BASE = getApiBase()
@@ -155,6 +155,11 @@ export const api = {
 
   sessions: {
     list: () => request<Session[]>('/sessions'),
+    sendPrompt: (pid: number, prompt: string) =>
+      request<{ sent: boolean; pid: number; tty: string; prompt_length: number }>(
+        `/sessions/${pid}/prompt`,
+        { method: 'POST', body: JSON.stringify({ prompt }) },
+      ),
   },
 
   events: {

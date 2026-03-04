@@ -1,5 +1,5 @@
-import { useCallback } from 'react'
-import { motion } from 'framer-motion'
+import { useCallback, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import PageTransition from '../components/PageTransition'
 import GlassCard from '../components/GlassCard'
 import { api } from '../api'
@@ -57,6 +57,29 @@ export default function SessionsPage() {
 function SessionCard({ session: s }: { session: Session }) {
   const isRunning = s.status === 'running'
   const glowColor = isRunning ? '#00f5a0' : '#6b7280'
+  const [showPrompt, setShowPrompt] = useState(false)
+  const [prompt, setPrompt] = useState('')
+  const [sending, setSending] = useState(false)
+  const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  const handleSendPrompt = async () => {
+    if (!prompt.trim()) return
+    setSending(true)
+    setResult(null)
+    try {
+      await api.sessions.sendPrompt(s.pid, prompt)
+      setResult({ type: 'success', message: `Prompt sent to ${s.tty}` })
+      setPrompt('')
+      setTimeout(() => {
+        setResult(null)
+        setShowPrompt(false)
+      }, 3000)
+    } catch (err) {
+      setResult({ type: 'error', message: err instanceof Error ? err.message : 'Failed to send' })
+    } finally {
+      setSending(false)
+    }
+  }
 
   return (
     <GlassCard glowColor={glowColor} padding="20px">
@@ -73,12 +96,27 @@ function SessionCard({ session: s }: { session: Session }) {
           </span>
           <span className="text-xs text-gray-500 font-mono">{s.tty}</span>
         </div>
-        <span
-          className={`text-xs rounded-full ${isRunning ? 'bg-neon-green/15 text-neon-green' : 'bg-gray-500/15 text-gray-400'}`}
-          style={{ padding: '2px 8px' }}
-        >
-          {s.status}
-        </span>
+        <div className="flex items-center" style={{ gap: '8px' }}>
+          {isRunning && (
+            <button
+              onClick={() => { setShowPrompt(!showPrompt); setResult(null) }}
+              className={`text-xs font-medium rounded-full transition-all ${
+                showPrompt
+                  ? 'bg-neon-purple/20 text-neon-purple border border-neon-purple/40'
+                  : 'bg-white/[0.05] text-gray-400 hover:text-white hover:bg-white/[0.1] border border-white/[0.1]'
+              }`}
+              style={{ padding: '4px 12px' }}
+            >
+              {showPrompt ? 'Cancel' : 'Send Prompt'}
+            </button>
+          )}
+          <span
+            className={`text-xs rounded-full ${isRunning ? 'bg-neon-green/15 text-neon-green' : 'bg-gray-500/15 text-gray-400'}`}
+            style={{ padding: '2px 8px' }}
+          >
+            {s.status}
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 text-xs" style={{ gap: '16px' }}>
@@ -118,6 +156,66 @@ function SessionCard({ session: s }: { session: Session }) {
           <div className="text-xs font-mono text-gray-400 truncate">{s.command}</div>
         </div>
       )}
+
+      {/* Prompt Input */}
+      <AnimatePresence>
+        {showPrompt && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{ overflow: 'hidden', marginTop: '16px' }}
+          >
+            <div
+              className="rounded-lg border border-neon-purple/30 bg-neon-purple/5"
+              style={{ padding: '14px' }}
+            >
+              <div className="text-xs text-neon-purple font-semibold" style={{ marginBottom: '8px' }}>
+                Send prompt to {s.tty} (PID {s.pid})
+              </div>
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Type your prompt here... (will be sent as keyboard input to the session)"
+                className="w-full bg-black/40 text-white text-sm font-mono rounded-lg border border-white/10 focus:border-neon-purple/50 focus:outline-none resize-none"
+                style={{ padding: '10px', minHeight: '80px' }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    handleSendPrompt()
+                  }
+                }}
+              />
+              <div className="flex items-center justify-between" style={{ marginTop: '8px' }}>
+                <span className="text-xs text-gray-500">Ctrl+Enter to send</span>
+                <div className="flex items-center" style={{ gap: '8px' }}>
+                  {result && (
+                    <motion.span
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className={`text-xs ${result.type === 'success' ? 'text-neon-green' : 'text-red-400'}`}
+                    >
+                      {result.message}
+                    </motion.span>
+                  )}
+                  <button
+                    onClick={handleSendPrompt}
+                    disabled={sending || !prompt.trim()}
+                    className={`text-xs font-bold rounded-full transition-all ${
+                      sending || !prompt.trim()
+                        ? 'bg-gray-600/30 text-gray-500 cursor-not-allowed'
+                        : 'bg-neon-purple/20 text-neon-purple hover:bg-neon-purple/30 border border-neon-purple/40'
+                    }`}
+                    style={{ padding: '6px 16px' }}
+                  >
+                    {sending ? 'Sending...' : 'Send Prompt'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </GlassCard>
   )
 }
