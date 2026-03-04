@@ -175,6 +175,7 @@ export const api = {
   sessions: {
     list: () => request<Session[]>('/sessions'),
     summary: (sessionId: string) => request<SessionSummary>(`/sessions/${sessionId}/summary`),
+    summaries: () => request<Record<string, SessionSummary>>('/sessions/summaries'),
     sendPrompt: (pid: number, prompt: string) =>
       request<{ sent: boolean; pid: number; tty: string; prompt_length: number }>(
         `/sessions/${pid}/prompt`,

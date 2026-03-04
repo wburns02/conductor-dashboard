@@ -8,7 +8,22 @@ import { usePolling } from '../hooks/usePolling'
 
 export default function SessionsPage() {
   const { data: sessions } = usePolling<Session[]>(useCallback(() => api.sessions.list(), []), 3000)
+  const [summaries, setSummaries] = useState<Record<string, SessionSummary>>({})
   const [automationSettings, setAutomationSettings] = useState<Record<string, AutomationSetting>>({})
+  const [summariesLoading, setSummariesLoading] = useState(true)
+
+  // Load all summaries on mount and poll every 30s
+  useEffect(() => {
+    let active = true
+    const load = () => {
+      api.sessions.summaries()
+        .then(data => { if (active) { setSummaries(data); setSummariesLoading(false) } })
+        .catch(() => { if (active) setSummariesLoading(false) })
+    }
+    load()
+    const interval = setInterval(load, 30000)
+    return () => { active = false; clearInterval(interval) }
+  }, [])
 
   // Load automation settings
   useEffect(() => {
@@ -29,6 +44,15 @@ export default function SessionsPage() {
     }
   }
 
+  const handleRefreshSummary = async (sessionId: string) => {
+    try {
+      const data = await api.sessions.summary(sessionId)
+      setSummaries(prev => ({ ...prev, [sessionId]: data }))
+    } catch {
+      // ignore
+    }
+  }
+
   return (
     <PageTransition>
       <div style={{ maxWidth: '1024px', margin: '0 auto', padding: '2rem 2rem', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -44,6 +68,9 @@ export default function SessionsPage() {
               {running.length} active
             </motion.span>
           )}
+          {summariesLoading && (
+            <span className="text-xs text-gray-500">Loading summaries...</span>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -56,8 +83,10 @@ export default function SessionsPage() {
             >
               <SessionCard
                 session={session}
+                summary={summaries[session.session_id] || null}
                 automationEnabled={!!automationSettings[session.session_id]?.enabled}
                 onToggleAutomation={handleToggleAutomation}
+                onRefreshSummary={handleRefreshSummary}
               />
             </motion.div>
           ))}
@@ -76,20 +105,20 @@ export default function SessionsPage() {
   )
 }
 
-function SessionCard({ session: s, automationEnabled, onToggleAutomation }: {
+function SessionCard({ session: s, summary, automationEnabled, onToggleAutomation, onRefreshSummary }: {
   session: Session
+  summary: SessionSummary | null
   automationEnabled: boolean
   onToggleAutomation: (sessionId: string, enabled: boolean) => void
+  onRefreshSummary: (sessionId: string) => void
 }) {
   const isRunning = s.status === 'running'
   const glowColor = isRunning ? '#00f5a0' : '#6b7280'
   const [showPrompt, setShowPrompt] = useState(false)
-  const [showSummary, setShowSummary] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
   const [prompt, setPrompt] = useState('')
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
-  const [summary, setSummary] = useState<SessionSummary | null>(null)
-  const [loadingSummary, setLoadingSummary] = useState(false)
 
   const handleSendPrompt = async () => {
     if (!prompt.trim()) return
@@ -110,27 +139,13 @@ function SessionCard({ session: s, automationEnabled, onToggleAutomation }: {
     }
   }
 
-  const handleLoadSummary = async () => {
-    if (showSummary) {
-      setShowSummary(false)
-      return
-    }
-    if (!s.session_id) return
-    setLoadingSummary(true)
-    setShowSummary(true)
-    try {
-      const data = await api.sessions.summary(s.session_id)
-      setSummary(data)
-    } catch {
-      setSummary(null)
-    } finally {
-      setLoadingSummary(false)
-    }
-  }
+  // Derive a short "what is this session doing" description
+  const taskDescription = summary?.last_user_message || summary?.last_assistant_message || null
 
   return (
     <GlassCard glowColor={glowColor} padding="20px">
-      <div className="flex flex-wrap items-start justify-between" style={{ marginBottom: '12px', gap: '8px' }}>
+      {/* Header Row */}
+      <div className="flex flex-wrap items-start justify-between" style={{ marginBottom: '8px', gap: '8px' }}>
         <div className="flex items-center" style={{ gap: '12px', minWidth: 0 }}>
           <motion.div
             className="rounded-full shrink-0"
@@ -144,19 +159,6 @@ function SessionCard({ session: s, automationEnabled, onToggleAutomation }: {
           <span className="text-xs text-gray-500 font-mono shrink-0">{s.tty}</span>
         </div>
         <div className="flex items-center flex-wrap" style={{ gap: '6px' }}>
-          {isRunning && s.session_id && (
-            <button
-              onClick={handleLoadSummary}
-              className={`text-xs font-medium rounded-full transition-all ${
-                showSummary
-                  ? 'bg-neon-blue/20 text-neon-blue border border-neon-blue/40'
-                  : 'bg-white/[0.05] text-gray-400 hover:text-white hover:bg-white/[0.1] border border-white/[0.1]'
-              }`}
-              style={{ padding: '4px 12px' }}
-            >
-              {showSummary ? 'Hide' : 'Summary'}
-            </button>
-          )}
           {isRunning && (
             <button
               onClick={() => { setShowPrompt(!showPrompt); setResult(null) }}
@@ -179,6 +181,128 @@ function SessionCard({ session: s, automationEnabled, onToggleAutomation }: {
         </div>
       </div>
 
+      {/* Inline Summary — always visible */}
+      {taskDescription && (
+        <div
+          className="rounded-lg border border-neon-blue/20 bg-neon-blue/5"
+          style={{ padding: '10px 12px', marginBottom: '10px' }}
+        >
+          <div className="flex items-start justify-between" style={{ gap: '8px' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="text-xs text-neon-blue/70 font-semibold" style={{ marginBottom: '4px' }}>
+                Current Activity
+                {summary?.cwd && summary.cwd !== '/home/will' && (
+                  <span className="text-gray-600 font-normal" style={{ marginLeft: '8px' }}>
+                    {summary.cwd.replace('/home/will/', '~/')}
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-gray-300" style={{ lineHeight: '1.5', maxHeight: '3em', overflow: 'hidden', wordBreak: 'break-word' }}>
+                {taskDescription.length > 200 ? taskDescription.slice(0, 200) + '...' : taskDescription}
+              </div>
+              {summary && summary.recent_tools.length > 0 && (
+                <div className="flex flex-wrap items-center" style={{ gap: '4px', marginTop: '6px' }}>
+                  {summary.recent_tools.map(tool => (
+                    <span key={tool} className="text-xs rounded-full bg-neon-purple/10 text-neon-purple/70" style={{ padding: '1px 6px' }}>
+                      {tool}
+                    </span>
+                  ))}
+                  <span className="text-xs text-gray-600" style={{ marginLeft: '4px' }}>
+                    {summary.transcript_size_mb} MB
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center shrink-0" style={{ gap: '4px' }}>
+              {s.session_id && (
+                <button
+                  onClick={() => onRefreshSummary(s.session_id)}
+                  className="text-xs text-gray-500 hover:text-neon-blue transition-colors"
+                  title="Refresh summary"
+                >
+                  ↻
+                </button>
+              )}
+              <button
+                onClick={() => setShowDetails(!showDetails)}
+                className="text-xs text-gray-500 hover:text-white transition-colors"
+              >
+                {showDetails ? '▲' : '▼'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* No summary available indicator */}
+      {!taskDescription && s.session_id && (
+        <div
+          className="rounded-lg border border-white/[0.06] bg-white/[0.02] text-xs text-gray-500"
+          style={{ padding: '8px 12px', marginBottom: '10px' }}
+        >
+          No activity summary available
+          {s.session_id && (
+            <button
+              onClick={() => onRefreshSummary(s.session_id)}
+              className="text-gray-400 hover:text-white transition-colors"
+              style={{ marginLeft: '8px' }}
+            >
+              ↻ Refresh
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Expanded Details */}
+      <AnimatePresence>
+        {showDetails && summary && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{ overflow: 'hidden', marginBottom: '10px' }}
+          >
+            <div
+              className="rounded-lg border border-neon-blue/30 bg-neon-blue/5"
+              style={{ padding: '12px' }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {summary.last_user_message && (
+                  <div>
+                    <span className="text-xs text-gray-500">Last User Message</span>
+                    <div className="text-xs text-gray-300 font-mono rounded bg-black/30" style={{ padding: '8px', marginTop: '4px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      {summary.last_user_message}
+                    </div>
+                  </div>
+                )}
+
+                {summary.last_assistant_message && (
+                  <div>
+                    <span className="text-xs text-gray-500">Last Assistant Response</span>
+                    <div className="text-xs text-gray-300 font-mono rounded bg-black/30" style={{ padding: '8px', marginTop: '4px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '150px', overflow: 'auto' }}>
+                      {summary.last_assistant_message}
+                    </div>
+                  </div>
+                )}
+
+                {summary.recent_files.length > 0 && (
+                  <div>
+                    <span className="text-xs text-gray-500">Recent Files</span>
+                    <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      {summary.recent_files.map(file => (
+                        <div key={file} className="text-xs font-mono text-gray-400 truncate">{file}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Compact Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 text-xs" style={{ gap: '16px' }}>
         <div>
           <span className="text-gray-500">PID</span>
@@ -198,22 +322,9 @@ function SessionCard({ session: s, automationEnabled, onToggleAutomation }: {
         </div>
       </div>
 
-      <div style={{ marginTop: '12px' }}>
-        <span className="text-xs text-gray-500">Working Directory</span>
-        <div className="text-sm font-mono text-neon-blue truncate">{s.cwd}</div>
-      </div>
-
       {s.session_slug && (
-        <div style={{ marginTop: '8px' }}>
-          <span className="text-xs text-gray-500">Session</span>
-          <div className="text-sm font-mono text-neon-purple">{s.session_slug}</div>
-        </div>
-      )}
-
-      {s.command && (
-        <div style={{ marginTop: '8px' }}>
-          <span className="text-xs text-gray-500">Command</span>
-          <div className="text-xs font-mono text-gray-400 truncate">{s.command}</div>
+        <div className="text-xs font-mono text-neon-purple truncate" style={{ marginTop: '8px' }}>
+          {s.session_slug}
         </div>
       )}
 
@@ -221,20 +332,20 @@ function SessionCard({ session: s, automationEnabled, onToggleAutomation }: {
       {isRunning && s.session_id && (
         <div
           className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02]"
-          style={{ marginTop: '12px', padding: '10px 14px' }}
+          style={{ marginTop: '10px', padding: '8px 12px' }}
         >
-          <div className="flex items-center" style={{ gap: '10px' }}>
+          <div className="flex items-center" style={{ gap: '8px' }}>
             <span className="text-xs text-gray-400">Auto-Conductor</span>
             <span className="text-xs text-gray-600">
-              {automationEnabled ? 'Conductor will auto-prompt this session' : 'Manual prompts only'}
+              {automationEnabled ? 'Auto-prompting enabled' : 'Manual only'}
             </span>
           </div>
           <button
             onClick={() => onToggleAutomation(s.session_id, !automationEnabled)}
             className="relative rounded-full transition-all"
             style={{
-              width: '40px',
-              height: '22px',
+              width: '36px',
+              height: '20px',
               backgroundColor: automationEnabled ? 'rgba(0, 245, 160, 0.3)' : 'rgba(107, 114, 128, 0.3)',
               border: `1px solid ${automationEnabled ? 'rgba(0, 245, 160, 0.5)' : 'rgba(107, 114, 128, 0.3)'}`,
             }}
@@ -242,95 +353,18 @@ function SessionCard({ session: s, automationEnabled, onToggleAutomation }: {
             <motion.div
               className="rounded-full"
               style={{
-                width: '16px',
-                height: '16px',
+                width: '14px',
+                height: '14px',
                 position: 'absolute',
                 top: '2px',
                 backgroundColor: automationEnabled ? '#00f5a0' : '#6b7280',
               }}
-              animate={{ left: automationEnabled ? '20px' : '2px' }}
+              animate={{ left: automationEnabled ? '18px' : '2px' }}
               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
             />
           </button>
         </div>
       )}
-
-      {/* Summary Panel */}
-      <AnimatePresence>
-        {showSummary && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            style={{ overflow: 'hidden', marginTop: '12px' }}
-          >
-            <div
-              className="rounded-lg border border-neon-blue/30 bg-neon-blue/5"
-              style={{ padding: '14px' }}
-            >
-              {loadingSummary ? (
-                <div className="text-xs text-gray-400">Loading summary...</div>
-              ) : summary ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div className="text-xs text-neon-blue font-semibold">Session Activity Summary</div>
-
-                  {summary.last_user_message && (
-                    <div>
-                      <span className="text-xs text-gray-500">Last User Message</span>
-                      <div className="text-xs text-gray-300 font-mono rounded bg-black/30" style={{ padding: '8px', marginTop: '4px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                        {summary.last_user_message}
-                      </div>
-                    </div>
-                  )}
-
-                  {summary.last_assistant_message && (
-                    <div>
-                      <span className="text-xs text-gray-500">Last Assistant Response</span>
-                      <div className="text-xs text-gray-300 font-mono rounded bg-black/30" style={{ padding: '8px', marginTop: '4px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '120px', overflow: 'auto' }}>
-                        {summary.last_assistant_message}
-                      </div>
-                    </div>
-                  )}
-
-                  {summary.recent_tools.length > 0 && (
-                    <div>
-                      <span className="text-xs text-gray-500">Recent Tools Used</span>
-                      <div className="flex flex-wrap" style={{ gap: '4px', marginTop: '4px' }}>
-                        {summary.recent_tools.map(tool => (
-                          <span key={tool} className="text-xs rounded-full bg-neon-purple/10 text-neon-purple/80 border border-neon-purple/20" style={{ padding: '2px 8px' }}>
-                            {tool}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {summary.recent_files.length > 0 && (
-                    <div>
-                      <span className="text-xs text-gray-500">Recent Files</span>
-                      <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        {summary.recent_files.slice(-5).map(file => (
-                          <div key={file} className="text-xs font-mono text-gray-400 truncate">{file}</div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-center" style={{ gap: '16px' }}>
-                    <span className="text-xs text-gray-600">Transcript: {summary.transcript_size_mb} MB</span>
-                    {summary.cwd && (
-                      <span className="text-xs text-gray-600">CWD: {summary.cwd}</span>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-xs text-gray-500">No summary available (session may not have a transcript yet)</div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Prompt Input */}
       <AnimatePresence>
@@ -340,19 +374,19 @@ function SessionCard({ session: s, automationEnabled, onToggleAutomation }: {
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            style={{ overflow: 'hidden', marginTop: '12px' }}
+            style={{ overflow: 'hidden', marginTop: '10px' }}
           >
             <div
               className="rounded-lg border border-neon-purple/30 bg-neon-purple/5"
-              style={{ padding: '14px' }}
+              style={{ padding: '12px' }}
             >
-              <div className="text-xs text-neon-purple font-semibold" style={{ marginBottom: '8px' }}>
+              <div className="text-xs text-neon-purple font-semibold" style={{ marginBottom: '6px' }}>
                 Send prompt to {s.tty} (PID {s.pid})
               </div>
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Type your prompt here... (will be sent as keyboard input to the session)"
+                placeholder="Type your prompt here..."
                 className="w-full bg-black/40 text-white text-sm font-mono rounded-lg border border-white/10 focus:border-neon-purple/50 focus:outline-none resize-none"
                 style={{ padding: '10px', minHeight: '80px' }}
                 onKeyDown={(e) => {
@@ -361,7 +395,7 @@ function SessionCard({ session: s, automationEnabled, onToggleAutomation }: {
                   }
                 }}
               />
-              <div className="flex items-center justify-between" style={{ marginTop: '8px' }}>
+              <div className="flex items-center justify-between" style={{ marginTop: '6px' }}>
                 <span className="text-xs text-gray-500">Ctrl+Enter to send</span>
                 <div className="flex items-center" style={{ gap: '8px' }}>
                   {result && (
