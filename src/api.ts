@@ -119,6 +119,25 @@ export interface Stats {
   total_cost: number
 }
 
+export interface SessionSummary {
+  session_id: string
+  slug: string
+  cwd: string
+  last_user_message: string
+  last_assistant_message: string
+  recent_tools: string[]
+  recent_files: string[]
+  transcript_size_mb: number
+}
+
+export interface AutomationSetting {
+  session_id: string
+  enabled: number
+  last_prompt_at: string | null
+  prompt_count: number
+  created_at: string
+}
+
 // API functions
 export const api = {
   health: () => request<{ status: string }>('/health'),
@@ -155,10 +174,17 @@ export const api = {
 
   sessions: {
     list: () => request<Session[]>('/sessions'),
+    summary: (sessionId: string) => request<SessionSummary>(`/sessions/${sessionId}/summary`),
     sendPrompt: (pid: number, prompt: string) =>
       request<{ sent: boolean; pid: number; tty: string; prompt_length: number }>(
         `/sessions/${pid}/prompt`,
         { method: 'POST', body: JSON.stringify({ prompt }) },
+      ),
+    automation: () => request<Record<string, AutomationSetting>>('/sessions/automation'),
+    setAutomation: (sessionId: string, enabled: boolean) =>
+      request<{ session_id: string; enabled: boolean }>(
+        `/sessions/${sessionId}/automation`,
+        { method: 'PUT', body: JSON.stringify({ enabled }) },
       ),
   },
 
