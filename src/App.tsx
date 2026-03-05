@@ -9,6 +9,7 @@ import HumanRequestsPage from './pages/HumanRequestsPage'
 import EventsPage from './pages/EventsPage'
 import SessionsPage from './pages/SessionsPage'
 import TerminalPage from './pages/TerminalPage'
+import IntelligencePage from './pages/IntelligencePage'
 
 export default function App() {
   const location = useLocation()
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/events" element={<EventsPage />} />
           <Route path="/sessions" element={<SessionsPage />} />
           <Route path="/terminal" element={<TerminalPage />} />
+          <Route path="/intelligence" element={<IntelligencePage />} />
         </Routes>
       </AnimatePresence>
     </Layout>

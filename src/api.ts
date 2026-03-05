@@ -165,6 +165,56 @@ export interface SprintEntry {
   source: string
 }
 
+export interface MemoryEntry {
+  id: number
+  project: string
+  entry_type: string
+  title: string
+  content: string | null
+  metadata: string | null
+  created_at: string
+  sprint_id: number | null
+}
+
+export interface ProjectContext {
+  project: string
+  config: Record<string, string>
+  changelog: Array<{ title: string; content: string; created_at: string }>
+  errors: Array<{ title: string; content: string; created_at: string }>
+  priorities: Array<{ title: string; content: string }>
+  notes: Array<{ title: string; content: string }>
+  monitor_events: Array<{ event_type: string; severity: string; title: string; details: string; created_at: string }>
+}
+
+export interface Monitor {
+  id: number
+  project: string
+  prod_url: string
+  health_url: string
+  enabled: number
+  check_interval: number
+  last_check_at: string | null
+  last_status: string
+  consecutive_failures: number
+  config: string | null
+}
+
+export interface MonitorSummary extends Monitor {
+  recent_events: MonitorEvent[]
+}
+
+export interface MonitorEvent {
+  id: number
+  project: string
+  event_type: string
+  severity: string
+  title: string
+  details: string
+  created_at: string
+  resolved_at: string | null
+  fix_sprint_id: number | null
+}
+
 // API functions
 export const api = {
   health: () => request<{ status: string }>('/health'),
@@ -228,6 +278,26 @@ export const api = {
 
   events: {
     list: (limit = 30) => request<EventLog[]>(`/events?limit=${limit}`),
+  },
+
+  memory: {
+    get: (project: string, entryType?: string) =>
+      request<MemoryEntry[]>(`/memory/${project}${entryType ? `?entry_type=${entryType}` : ''}`),
+    context: (project: string) => request<ProjectContext>(`/memory/${project}/context`),
+    add: (entry: { project: string; entry_type: string; title: string; content?: string; metadata?: Record<string, unknown> }) =>
+      request<{ status: string }>('/memory', { method: 'POST', body: JSON.stringify(entry) }),
+    delete: (entryId: number) => request<{ status: string }>(`/memory/${entryId}`, { method: 'DELETE' }),
+  },
+
+  monitors: {
+    list: () => request<Monitor[]>('/monitors'),
+    summary: () => request<MonitorSummary[]>('/monitors/summary'),
+    create: (m: { project: string; prod_url: string; health_url?: string; check_interval?: number }) =>
+      request<{ status: string }>('/monitors', { method: 'POST', body: JSON.stringify(m) }),
+    toggle: (project: string, enabled: boolean) =>
+      request<{ status: string }>(`/monitors/${project}?enabled=${enabled}`, { method: 'PATCH' }),
+    events: (project: string, limit = 50) =>
+      request<MonitorEvent[]>(`/monitors/${project}/events?limit=${limit}`),
   },
 
   clear: () => request<{ cleared: boolean }>('/clear', { method: 'POST' }),
