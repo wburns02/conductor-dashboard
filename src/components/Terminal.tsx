@@ -7,6 +7,7 @@ import '@xterm/xterm/css/xterm.css'
 interface TerminalProps {
   className?: string
   style?: React.CSSProperties
+  initialCommand?: string
 }
 
 function getWsBase(): string {
@@ -18,7 +19,7 @@ function getWsBase(): string {
   return 'ws://localhost:8787'
 }
 
-export default function Terminal({ className, style }: TerminalProps) {
+export default function Terminal({ className, style, initialCommand }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<XTerm | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
@@ -78,6 +79,12 @@ export default function Terminal({ className, style }: TerminalProps) {
 
     ws.onopen = () => {
       term.focus()
+      // Send initial command after shell prompt appears
+      if (initialCommand) {
+        setTimeout(() => {
+          ws.send(initialCommand + '\n')
+        }, 500)
+      }
     }
 
     ws.onmessage = (event) => {
