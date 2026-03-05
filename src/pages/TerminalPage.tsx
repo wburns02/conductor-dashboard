@@ -35,7 +35,24 @@ export default function TerminalPage() {
   const launchVibeLoopWithPrompt = (project: typeof PROJECTS[0]) => {
     // Launch Claude interactively with --dangerously-skip-permissions
     // The prompt is sent as a second initialCommand after Claude starts up
-    const prompt = `Review the current state of the ${project.name} project. Check what pages and features exist, test the production site with Playwright at ${project.prod || 'localhost'}, identify bugs or missing features, then pick the highest-impact improvement and build it. Push to GitHub when done. Test with Playwright, fix failures, iterate up to 30 times.`
+    const prompt = `You are doing a deep QA audit of ${project.name}. Use Playwright to test the production site at ${project.prod || 'localhost:5173'}.
+
+STEP 1 — DEEP SCAN: Open every page. On each page:
+- Click every button, link, tab, and dropdown
+- Fill out every form and hit Save/Submit — verify it actually saves (check for success toast, network response, or data appearing)
+- Check for console errors, broken layouts, missing data, buttons that do nothing
+- Test navigation between pages
+
+STEP 2 — RANK: From everything you found, list the TOP 5 most critical issues (bugs, broken features, non-functional buttons, forms that don't save, pages that crash).
+
+STEP 3 — FIX ALL 5: Work through each issue one by one. For each:
+1. Fix the root cause in the code
+2. Test with Playwright to verify the fix works (click the button, submit the form, confirm it saves)
+3. If the fix breaks something else, fix that too
+
+STEP 4 — FINAL VERIFICATION: Run a full Playwright pass across all pages to confirm everything works. Click buttons, submit forms, verify saves.
+
+Push to GitHub after each fix. Iterate up to 30 times if needed. Do not stop until all 5 issues are verified fixed.`
     const cmd = `cd ${project.dir} && claude --dangerously-skip-permissions`
     const id = Math.max(...terminals.map(t => t.id), 0) + 1
     setTerminals(prev => [...prev, { id, label: `sprint: ${project.name}`, command: cmd, autoPrompt: prompt }])
