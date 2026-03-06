@@ -8,6 +8,7 @@ interface TerminalInstance {
   label: string
   command?: string
   autoPrompt?: string
+  autoRepeat?: boolean
 }
 
 const PROJECTS = [
@@ -37,7 +38,7 @@ export default function TerminalPage() {
   const launchWithPrompt = (project: typeof PROJECTS[0], label: string, prompt: string) => {
     const cmd = `cd ${project.dir} && claude --dangerously-skip-permissions`
     const id = Math.max(...terminals.map(t => t.id), 0) + 1
-    setTerminals(prev => [...prev, { id, label: `${label}: ${project.name}`, command: cmd, autoPrompt: prompt }])
+    setTerminals(prev => [...prev, { id, label: `${label}: ${project.name}`, command: cmd, autoPrompt: prompt, autoRepeat: true }])
     setShowLauncher(false)
   }
 
@@ -282,7 +283,7 @@ Iterate up to 30 times on failures.`
                 </button>
               </div>
               <div style={{ height: 'calc(100% - 28px)' }}>
-                <Terminal initialCommand={t.command} delayedCommand={t.autoPrompt} />
+                <Terminal initialCommand={t.command} delayedCommand={t.autoPrompt} autoRepeat={t.autoRepeat} />
               </div>
             </GlassCard>
           ))}

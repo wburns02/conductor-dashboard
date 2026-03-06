@@ -9,6 +9,7 @@ interface TerminalProps {
   style?: React.CSSProperties
   initialCommand?: string
   delayedCommand?: string  // Sent after a longer delay (e.g. for Claude to start up first)
+  autoRepeat?: boolean     // If true, re-send delayedCommand when Claude goes idle
 }
 
 function getWsBase(): string {
@@ -20,7 +21,7 @@ function getWsBase(): string {
   return 'ws://localhost:8787'
 }
 
-export default function Terminal({ className, style, initialCommand, delayedCommand }: TerminalProps) {
+export default function Terminal({ className, style, initialCommand, delayedCommand, autoRepeat }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<XTerm | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
@@ -78,6 +79,30 @@ export default function Terminal({ className, style, initialCommand, delayedComm
     ws.binaryType = 'arraybuffer'
     wsRef.current = ws
 
+    // Idle detection for auto-repeat
+    let idleTimer: ReturnType<typeof setTimeout> | null = null
+    let initialPromptSent = false
+    let recentOutput = ''
+
+    const checkIdle = () => {
+      if (!delayedCommand || !autoRepeat || !initialPromptSent) return
+      // Look for Claude's idle prompt: ❯ at end of output with no activity
+      // The ❯ character appears when Claude is waiting for input
+      const lastChunk = recentOutput.slice(-200)
+      const hasIdlePrompt = lastChunk.includes('❯') || lastChunk.includes('\u276f')
+      const hasBypassMsg = lastChunk.includes('bypass permissions')
+      if (hasIdlePrompt || hasBypassMsg) {
+        // Claude is idle — send the next prompt after a short pause
+        term.write('\r\n\x1b[33m[Auto-repeat: sending next sprint prompt...]\x1b[0m\r\n')
+        setTimeout(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(delayedCommand)
+            setTimeout(() => ws.send('\r'), 300)
+          }
+        }, 3000)
+      }
+    }
+
     ws.onopen = () => {
       term.focus()
       // Send initial command after shell prompt appears
@@ -92,21 +117,41 @@ export default function Terminal({ className, style, initialCommand, delayedComm
         setTimeout(() => {
           ws.send(delayedCommand)
           // Small delay then press Enter via carriage return
-          setTimeout(() => ws.send('\r'), 300)
+          setTimeout(() => {
+            ws.send('\r')
+            initialPromptSent = true
+          }, 300)
         }, 8000)
       }
     }
 
     ws.onmessage = (event) => {
+      let text = ''
       if (event.data instanceof ArrayBuffer) {
-        term.write(new Uint8Array(event.data))
+        const bytes = new Uint8Array(event.data)
+        term.write(bytes)
+        text = new TextDecoder().decode(bytes)
       } else {
         term.write(event.data)
+        text = event.data
+      }
+
+      // Track recent output for idle detection
+      if (delayedCommand && autoRepeat && initialPromptSent) {
+        recentOutput += text
+        // Keep only last 500 chars
+        if (recentOutput.length > 1000) {
+          recentOutput = recentOutput.slice(-500)
+        }
+        // Reset idle timer — check for idle after 30s of no new output
+        if (idleTimer) clearTimeout(idleTimer)
+        idleTimer = setTimeout(checkIdle, 30000)
       }
     }
 
     ws.onclose = () => {
       term.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n')
+      if (idleTimer) clearTimeout(idleTimer)
     }
 
     ws.onerror = () => {
@@ -134,6 +179,7 @@ export default function Terminal({ className, style, initialCommand, delayedComm
     observer.observe(containerRef.current)
 
     return () => {
+      if (idleTimer) clearTimeout(idleTimer)
       observer.disconnect()
       ws.close()
       term.dispose()
