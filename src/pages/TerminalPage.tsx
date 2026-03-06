@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import PageTransition from '../components/PageTransition'
 import GlassCard from '../components/GlassCard'
-import Terminal from '../components/Terminal'
+import Terminal, { type TerminalStatus } from '../components/Terminal'
 
 interface TerminalInstance {
   id: number
@@ -9,6 +9,30 @@ interface TerminalInstance {
   command?: string
   autoPrompt?: string
   autoRepeat?: boolean
+}
+
+function formatTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  } catch { return '' }
+}
+
+const STATE_COLORS: Record<string, string> = {
+  'starting': 'text-yellow-400',
+  'waiting-for-claude': 'text-yellow-400',
+  'prompt-sent': 'text-cyan-400',
+  'running': 'text-neon-green',
+  'idle': 'text-orange-400',
+  'disconnected': 'text-red-400',
+}
+
+const STATE_LABELS: Record<string, string> = {
+  'starting': 'Starting...',
+  'waiting-for-claude': 'Waiting for Claude...',
+  'prompt-sent': 'Sending prompt...',
+  'running': 'Running',
+  'idle': 'Idle',
+  'disconnected': 'Disconnected',
 }
 
 const PROJECTS = [
@@ -28,6 +52,7 @@ const COMPETITORS: Record<string, string[]> = {
 export default function TerminalPage() {
   const [terminals, setTerminals] = useState<TerminalInstance[]>([{ id: 1, label: 'bash' }])
   const [showLauncher, setShowLauncher] = useState(false)
+  const [statuses, setStatuses] = useState<Record<number, TerminalStatus>>({})
 
   const addTerminal = (label: string, command?: string) => {
     const id = Math.max(...terminals.map(t => t.id), 0) + 1
@@ -264,29 +289,58 @@ Iterate up to 30 times on failures.`
 
         {/* Terminal Grid */}
         <div style={{ flex: 1, display: 'grid', gridTemplateColumns: terminals.length > 1 ? '1fr 1fr' : '1fr', gap: '10px', minHeight: 0 }}>
-          {terminals.map((t) => (
+          {terminals.map((t) => {
+            const status = statuses[t.id]
+            return (
             <GlassCard key={t.id} glowColor={t.label.startsWith('vision') ? '#a855f7' : t.label.startsWith('pipeline') ? '#ff006e' : t.label.startsWith('qa') ? '#00f5a0' : t.command ? '#00d2ff' : '#00f5a0'} padding="0">
               <div className="flex items-center justify-between" style={{ padding: '5px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <span className={`text-xs font-mono ${t.command ? 'text-neon-purple' : 'text-gray-400'}`}>
-                  {t.label} #{t.id}
-                </span>
-                <button
-                  onClick={() => {
-                    if (terminals.length > 1) {
-                      setTerminals(prev => prev.filter(x => x.id !== t.id))
-                    }
-                  }}
-                  className="text-xs text-gray-500 hover:text-red-400 transition-colors"
-                  style={{ padding: '0 4px' }}
-                >
-                  x
-                </button>
+                <div className="flex items-center" style={{ gap: '8px' }}>
+                  <span className={`text-xs font-mono ${t.command ? 'text-neon-purple' : 'text-gray-400'}`}>
+                    {t.label} #{t.id}
+                  </span>
+                  {status && (
+                    <>
+                      <span className={`text-xs font-mono ${STATE_COLORS[status.state] || 'text-gray-500'}`}>
+                        {STATE_LABELS[status.state] || status.state}
+                      </span>
+                      {status.sprintCount > 0 && (
+                        <span className="text-xs font-mono text-gray-500">
+                          Sprint #{status.sprintCount}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center" style={{ gap: '8px' }}>
+                  {status && (
+                    <span className="text-xs font-mono text-gray-600">
+                      {formatTime(status.startedAt)} | Last: {formatTime(status.lastActivity)}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => {
+                      if (terminals.length > 1) {
+                        setTerminals(prev => prev.filter(x => x.id !== t.id))
+                      }
+                    }}
+                    className="text-xs text-gray-500 hover:text-red-400 transition-colors"
+                    style={{ padding: '0 4px' }}
+                  >
+                    x
+                  </button>
+                </div>
               </div>
               <div style={{ height: 'calc(100% - 28px)' }}>
-                <Terminal initialCommand={t.command} delayedCommand={t.autoPrompt} autoRepeat={t.autoRepeat} />
+                <Terminal
+                  initialCommand={t.command}
+                  delayedCommand={t.autoPrompt}
+                  autoRepeat={t.autoRepeat}
+                  onStatusChange={(s) => setStatuses(prev => ({ ...prev, [t.id]: s }))}
+                />
               </div>
             </GlassCard>
-          ))}
+            )
+          })}
         </div>
       </div>
     </PageTransition>

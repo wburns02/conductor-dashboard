@@ -8,8 +8,27 @@ interface TerminalProps {
   className?: string
   style?: React.CSSProperties
   initialCommand?: string
-  delayedCommand?: string  // Sent after a longer delay (e.g. for Claude to start up first)
+  delayedCommand?: string  // Sent after Claude shows its ready prompt
   autoRepeat?: boolean     // If true, re-send delayedCommand when Claude goes idle
+  onStatusChange?: (status: TerminalStatus) => void
+}
+
+export interface TerminalStatus {
+  state: 'starting' | 'waiting-for-claude' | 'prompt-sent' | 'running' | 'idle' | 'disconnected'
+  startedAt: string
+  lastActivity: string
+  sprintCount: number
+}
+
+// Strip ALL terminal escape codes for text matching
+function stripAnsi(str: string): string {
+  return str
+    .replace(/\x1b\[\??[0-9;]*[a-zA-Z]/g, '')  // CSI sequences (including ? mode)
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')  // OSC sequences
+    .replace(/\x1b[()][0-9A-B]/g, '')  // Character set
+    .replace(/\x1b[=>MNOP78]/g, '')  // Simple escapes
+    .replace(/\x1bP[^\x1b]*\x1b\\/g, '')  // DCS sequences
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '')  // Control chars (keep \n \r \t)
 }
 
 function getWsBase(): string {
@@ -21,7 +40,7 @@ function getWsBase(): string {
   return 'ws://localhost:8787'
 }
 
-export default function Terminal({ className, style, initialCommand, delayedCommand, autoRepeat }: TerminalProps) {
+export default function Terminal({ className, style, initialCommand, delayedCommand, autoRepeat, onStatusChange }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<XTerm | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
@@ -29,6 +48,20 @@ export default function Terminal({ className, style, initialCommand, delayedComm
 
   const connect = useCallback(() => {
     if (!containerRef.current) return
+
+    const startedAt = new Date().toISOString()
+    let sprintCount = 0
+
+    const updateStatus = (state: TerminalStatus['state']) => {
+      onStatusChange?.({
+        state,
+        startedAt,
+        lastActivity: new Date().toISOString(),
+        sprintCount,
+      })
+    }
+
+    updateStatus('starting')
 
     // Create terminal
     const term = new XTerm({
@@ -79,49 +112,79 @@ export default function Terminal({ className, style, initialCommand, delayedComm
     ws.binaryType = 'arraybuffer'
     wsRef.current = ws
 
-    // Idle detection for auto-repeat
+    // State tracking
     let idleTimer: ReturnType<typeof setTimeout> | null = null
-    let initialPromptSent = false
+    let readyDetected = false  // Guard: only detect Claude ready ONCE
+    let promptSent = false     // True after first prompt fully sent + Enter pressed
+    let sendingPrompt = false  // True while a prompt is being chunked out
     let recentOutput = ''
+    let allOutput = ''
+
+    // Send the prompt text in chunks to avoid PTY buffer overflow
+    const sendPrompt = (command: string) => {
+      if (ws.readyState !== WebSocket.OPEN || sendingPrompt) return
+      sendingPrompt = true
+      const CHUNK_SIZE = 256
+      let i = 0
+      const sendChunk = () => {
+        if (i >= command.length) {
+          // All text sent — now press Enter
+          setTimeout(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send('\r')
+              promptSent = true
+              sendingPrompt = false
+              sprintCount++
+              recentOutput = ''  // Reset so idle detection starts fresh
+              updateStatus('running')
+              term.write(`\r\n\x1b[36m[Sprint #${sprintCount} submitted at ${new Date().toLocaleTimeString()}]\x1b[0m\r\n`)
+            }
+          }, 500)
+          return
+        }
+        const chunk = command.slice(i, i + CHUNK_SIZE)
+        ws.send(chunk)
+        i += CHUNK_SIZE
+        setTimeout(sendChunk, 50)
+      }
+      sendChunk()
+    }
 
     const checkIdle = () => {
-      if (!delayedCommand || !autoRepeat || !initialPromptSent) return
-      // Look for Claude's idle prompt: ❯ at end of output with no activity
-      // The ❯ character appears when Claude is waiting for input
-      const lastChunk = recentOutput.slice(-200)
-      const hasIdlePrompt = lastChunk.includes('❯') || lastChunk.includes('\u276f')
+      if (!delayedCommand || !autoRepeat || !promptSent || sendingPrompt) return
+      const lastChunk = recentOutput.slice(-300)
+      // Look for Claude's idle state: the ❯ prompt appearing AFTER output stops
+      // This only fires after 30s of silence, so the ❯ is the idle prompt, not the status bar
+      const hasIdlePrompt = lastChunk.includes('\u276f') || lastChunk.includes('❯')
       const hasBypassMsg = lastChunk.includes('bypass permissions')
       if (hasIdlePrompt || hasBypassMsg) {
-        // Claude is idle — send the next prompt after a short pause
-        term.write('\r\n\x1b[33m[Auto-repeat: sending next sprint prompt...]\x1b[0m\r\n')
-        setTimeout(() => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(delayedCommand)
-            setTimeout(() => ws.send('\r'), 300)
-          }
-        }, 3000)
+        updateStatus('idle')
+        term.write(`\r\n\x1b[33m[Auto-repeat: Claude idle at ${new Date().toLocaleTimeString()} — sending next sprint...]\x1b[0m\r\n`)
+        promptSent = false  // Reset so sendPrompt sets it again
+        setTimeout(() => sendPrompt(delayedCommand), 3000)
       }
     }
 
     ws.onopen = () => {
       term.focus()
-      // Send initial command after shell prompt appears
+      updateStatus('starting')
       if (initialCommand) {
         setTimeout(() => {
           ws.send(initialCommand + '\n')
+          if (delayedCommand) {
+            updateStatus('waiting-for-claude')
+            // Fallback: if detection hasn't fired after 15s, send prompt anyway
+            setTimeout(() => {
+              if (!readyDetected) {
+                readyDetected = true
+                allOutput = ''
+                term.write(`\r\n\x1b[33m[Fallback: sending prompt after 15s timeout at ${new Date().toLocaleTimeString()}...]\x1b[0m\r\n`)
+                updateStatus('prompt-sent')
+                setTimeout(() => sendPrompt(delayedCommand), 1000)
+              }
+            }, 15000)
+          }
         }, 500)
-      }
-      // Send delayed command (e.g. prompt for Claude after it starts up)
-      // Wait 8s for Claude to initialize, then send text + Enter (\r)
-      if (delayedCommand) {
-        setTimeout(() => {
-          ws.send(delayedCommand)
-          // Small delay then press Enter via carriage return
-          setTimeout(() => {
-            ws.send('\r')
-            initialPromptSent = true
-          }, 300)
-        }, 8000)
       }
     }
 
@@ -136,14 +199,42 @@ export default function Terminal({ className, style, initialCommand, delayedComm
         text = event.data
       }
 
-      // Track recent output for idle detection
-      if (delayedCommand && autoRepeat && initialPromptSent) {
-        recentOutput += text
-        // Keep only last 500 chars
+      // Track output for Claude ready detection (fires exactly ONCE)
+      if (delayedCommand && !readyDetected) {
+        const clean = stripAnsi(text)
+        allOutput += clean
+        if (allOutput.length > 5000) {
+          allOutput = allOutput.slice(-2000)
+        }
+
+        // Auto-dismiss trust dialog: "Is this a project you created or one you trust?"
+        if (allOutput.includes('trust this folder') && allOutput.includes('Enter to confirm')) {
+          allOutput = ''
+          term.write(`\r\n\x1b[33m[Auto-accepting trust dialog...]\x1b[0m\r\n`)
+          setTimeout(() => {
+            if (ws.readyState === WebSocket.OPEN) ws.send('\r')
+          }, 1000)
+          return
+        }
+
+        // Detect Claude's ACTUAL ready state: "bypass permissions" in the status bar
+        // Only appears after Claude fully initializes, never in trust dialog
+        if (allOutput.includes('bypass permissions')) {
+          readyDetected = true
+          allOutput = ''
+          term.write(`\r\n\x1b[36m[Claude ready — sending prompt at ${new Date().toLocaleTimeString()}...]\x1b[0m\r\n`)
+          updateStatus('prompt-sent')
+          setTimeout(() => sendPrompt(delayedCommand), 2000)
+        }
+      }
+
+      // Track recent output for idle detection (after first prompt sent)
+      if (delayedCommand && autoRepeat && promptSent && !sendingPrompt) {
+        recentOutput += stripAnsi(text)
         if (recentOutput.length > 1000) {
           recentOutput = recentOutput.slice(-500)
         }
-        // Reset idle timer — check for idle after 30s of no new output
+        updateStatus('running')
         if (idleTimer) clearTimeout(idleTimer)
         idleTimer = setTimeout(checkIdle, 30000)
       }
@@ -151,6 +242,7 @@ export default function Terminal({ className, style, initialCommand, delayedComm
 
     ws.onclose = () => {
       term.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n')
+      updateStatus('disconnected')
       if (idleTimer) clearTimeout(idleTimer)
     }
 
