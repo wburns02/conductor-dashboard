@@ -40,6 +40,7 @@ const PROJECTS = [
   { name: 'LandscapeCRM', dir: '~/LandscapeCRM', backend: '~/landscape-crm-api', prod: '' },
   { name: 'CrownHardware', dir: '~/CrownHardware', backend: '~/CrownHardware/backend', prod: '' },
   { name: 'ReactCRM', dir: '~/ReactCRM', backend: '~/react-crm-api', prod: 'https://react.ecbtx.com' },
+  { name: 'PeakDipVibe', dir: '~/PeakDipVibe', backend: '', prod: '' },
 ]
 
 const COMPETITORS: Record<string, string[]> = {
@@ -47,6 +48,7 @@ const COMPETITORS: Record<string, string[]> = {
   LandscapeCRM: ['Jobber (one-click rebooking, automated invoicing, client hub)', 'ServiceTitan (GPS fleet tracking, real-time dispatch, customer ETA texts)', 'LMN (crew time tracking, job costing, budget vs actual)', 'Aspire (proposal builder, route optimization, chemical tracking)', 'SingleOps (drag-and-drop scheduling, photo documentation, recurring services)'],
   CrownHardware: ['Fishbowl (manufacturing BOM, work orders, inventory forecasting)', 'Katana (visual production planning, batch tracking, live floor control)', 'MRPeasy (capacity planning, quality control, shipping integration)', 'JobBOSS (quoting, shop floor data collection, tool tracking)', 'Odoo Manufacturing (PLM, quality alerts, maintenance scheduling)'],
   ReactCRM: ['ServiceTitan (AI dispatch, pricebook management, real-time GPS)', 'Housecall Pro (online booking, automated follow-ups, review requests)', 'FieldEdge (QuickBooks sync, flat-rate pricing, performance dashboards)', 'Workiz (AI call answering, lead scoring, two-way SMS)', 'Service Fusion (estimate-to-invoice pipeline, fleet GPS, customer portal)'],
+  PeakDipVibe: ['TradingView (advanced charting, Pine Script alerts, social trading ideas)', 'Thinkorswim (real-time scanners, thinkScript backtesting, options analytics)', 'Trade Ideas (AI-powered scanner, Holly AI bot, simulated trading)', 'Finviz (visual stock screener, heatmaps, insider trading tracker)', 'StockCharts (technical scan workbench, breadth indicators, sector rotation)'],
 }
 
 export default function TerminalPage() {
