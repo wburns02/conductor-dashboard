@@ -5,8 +5,9 @@ import PageTransition from '../components/PageTransition'
 import GlassCard from '../components/GlassCard'
 import StatusBadge from '../components/StatusBadge'
 import { api } from '../api'
-import type { Stats, Task, Worker, EventLog, Session } from '../api'
+import type { Stats, Task, Worker, EventLog, Session, Gen4Dashboard } from '../api'
 import { usePolling } from '../hooks/usePolling'
+import { useSSE } from '../hooks/useSSE'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
@@ -15,6 +16,12 @@ export default function DashboardPage() {
   const { data: tasks } = usePolling<Task[]>(useCallback(() => api.tasks.list(), []), 5000)
   const { data: workers } = usePolling<Worker[]>(useCallback(() => api.workers.active(), []), 5000)
   const { data: events } = usePolling<EventLog[]>(useCallback(() => api.events.list(15), []), 5000)
+  const { data: gen4 } = usePolling<Gen4Dashboard>(useCallback(() => api.gen4.dashboard(), []), 10000)
+
+  // SSE for real-time updates (supplements polling with instant push)
+  const { connected: sseConnected, lastEvents } = useSSE({
+    events: ['stats', 'sprints', 'event', 'gen4_intervention'],
+  })
 
   const running = sessions?.filter(s => s.status === 'running') || []
   const recentTasks = tasks?.slice(0, 6) || []
@@ -38,6 +45,17 @@ export default function DashboardPage() {
                   {running.length} active
                 </motion.span>
               )}
+              {/* SSE connection indicator */}
+              <span
+                className="rounded-full text-xs"
+                style={{
+                  padding: '2px 8px',
+                  backgroundColor: sseConnected ? 'rgba(0, 245, 160, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                  color: sseConnected ? '#00f5a0' : '#ef4444',
+                }}
+              >
+                {sseConnected ? 'SSE' : 'polling'}
+              </span>
             </div>
             <button onClick={() => navigate('/sessions')} className="text-xs text-gray-400 hover:text-white transition-colors">View all →</button>
           </div>
@@ -100,18 +118,119 @@ export default function DashboardPage() {
           )}
         </div>
 
+        {/* Gen4 Research Lab Status */}
+        {gen4 && gen4.enabled && (
+          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+            <div className="flex items-center justify-between" style={{ marginBottom: '12px' }}>
+              <h2 className="text-lg font-semibold text-gray-400">Gen4 Research Lab</h2>
+              <div className="flex items-center" style={{ gap: '8px' }}>
+                {Object.entries(gen4.experiments).map(([name, enabled]) => (
+                  <span
+                    key={name}
+                    className="text-xs font-mono rounded"
+                    style={{
+                      padding: '2px 6px',
+                      backgroundColor: enabled ? 'rgba(0, 245, 160, 0.08)' : 'rgba(107, 114, 128, 0.1)',
+                      color: enabled ? '#00f5a0' : '#6b7280',
+                    }}
+                  >
+                    {name.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()).slice(0, 12)}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="grid md:grid-cols-3" style={{ gap: '12px' }}>
+              {/* Genome Fitness */}
+              <GlassCard glowColor="#a855f7" padding="14px">
+                <div className="text-xs text-gray-500" style={{ marginBottom: '8px' }}>Top Genomes</div>
+                {gen4.genome_fitness_trend.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {gen4.genome_fitness_trend.map(g => (
+                      <div key={g.id} className="flex items-center justify-between text-xs">
+                        <span className="font-mono text-white">#{g.id} (gen {g.generation})</span>
+                        <div className="flex items-center" style={{ gap: '8px' }}>
+                          <span className="text-neon-green">{g.wins}W</span>
+                          <span className="text-red-400">{g.losses}L</span>
+                          <span className="font-bold" style={{ color: g.fitness > 0.6 ? '#00f5a0' : g.fitness > 0.4 ? '#eab308' : '#ef4444' }}>
+                            {g.fitness.toFixed(3)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-600">No genome data yet</div>
+                )}
+              </GlassCard>
+
+              {/* Active Interventions */}
+              <GlassCard glowColor="#ff006e" padding="14px">
+                <div className="text-xs text-gray-500" style={{ marginBottom: '8px' }}>Metacognition</div>
+                {gen4.active_interventions.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {gen4.active_interventions.slice(0, 3).map(i => (
+                      <div key={i.id} className="rounded bg-white/[0.03] border border-white/[0.05]" style={{ padding: '6px' }}>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-mono text-neon-pink">{i.trigger_pattern}</span>
+                          <span className="text-gray-500">{i.intervention}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-neon-green">No interventions needed</div>
+                )}
+                {/* Show SSE-pushed intervention if available */}
+                {lastEvents.gen4_intervention != null && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="rounded bg-neon-pink/10 border border-neon-pink/20 text-xs text-neon-pink"
+                    style={{ padding: '6px', marginTop: '6px' }}
+                  >
+                    {'Live: ' + String((lastEvents.gen4_intervention as { trigger_pattern?: string })?.trigger_pattern ?? 'intervention')}
+                  </motion.div>
+                )}
+              </GlassCard>
+
+              {/* Recent Activity */}
+              <GlassCard glowColor="#00d4ff" padding="14px">
+                <div className="text-xs text-gray-500" style={{ marginBottom: '8px' }}>Recent Activity</div>
+                {gen4.recent_activity.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {gen4.recent_activity.slice(0, 4).map((a, idx) => (
+                      <div key={idx} className="flex items-center text-xs" style={{ gap: '6px' }}>
+                        <span className="font-mono" style={{
+                          color: a.type === 'adversarial' ? '#ff006e' :
+                                 a.type === 'evolution' ? '#a855f7' :
+                                 a.type === 'distiller' ? '#00d4ff' : '#6b7280'
+                        }}>
+                          {a.type}
+                        </span>
+                        <span className="text-gray-400 truncate">{a.detail}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-600">No Gen4 activity yet</div>
+                )}
+              </GlassCard>
+            </div>
+          </motion.div>
+        )}
+
         {/* Conductor Stats — Secondary */}
         {stats && (stats.total_tasks > 0 || (workers && workers.length > 0)) && (
           <div>
             <h2 className="text-lg font-semibold text-gray-400" style={{ marginBottom: '12px' }}>Conductor Orchestration</h2>
             <div className="grid grid-cols-3 md:grid-cols-6" style={{ gap: '12px' }}>
               {[
-                { val: stats.total_tasks, label: 'Tasks', icon: '◈', color: '#8338ec' },
-                { val: stats.running, label: 'Running', icon: '▶', color: '#3b82f6' },
-                { val: stats.pending, label: 'Pending', icon: '◇', color: '#eab308' },
-                { val: stats.completed, label: 'Done', icon: '✓', color: '#10b981' },
-                { val: stats.failed, label: 'Failed', icon: '✕', color: '#ef4444' },
-                { val: stats.active_workers, label: 'Workers', icon: '⚡', color: '#00d4ff' },
+                { val: stats.total_tasks, label: 'Tasks', icon: '\u25C8', color: '#8338ec' },
+                { val: stats.running, label: 'Running', icon: '\u25B6', color: '#3b82f6' },
+                { val: stats.pending, label: 'Pending', icon: '\u25C7', color: '#eab308' },
+                { val: stats.completed, label: 'Done', icon: '\u2713', color: '#10b981' },
+                { val: stats.failed, label: 'Failed', icon: '\u2715', color: '#ef4444' },
+                { val: stats.active_workers, label: 'Workers', icon: '\u26A1', color: '#00d4ff' },
               ].map(({ val, label, icon, color }, i) => (
                 <motion.div key={label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + i * 0.03 }}>
                   <GlassCard glowColor={color} padding="12px">
@@ -139,7 +258,7 @@ export default function DashboardPage() {
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}>
             <GlassCard glowColor="#00d4ff" padding="20px">
               <h2 className="text-lg font-semibold text-neon-blue flex items-center" style={{ marginBottom: '16px', gap: '8px' }}>
-                <span className="text-xl">⚡</span> Active Workers
+                <span className="text-xl">{'\u26A1'}</span> Active Workers
               </h2>
               {workers && workers.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -166,7 +285,7 @@ export default function DashboardPage() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
             <GlassCard glowColor="#8338ec" padding="20px">
               <h2 className="text-lg font-semibold text-neon-purple flex items-center justify-between" style={{ marginBottom: '16px' }}>
-                <span className="flex items-center" style={{ gap: '8px' }}><span className="text-xl">◈</span> Tasks</span>
+                <span className="flex items-center" style={{ gap: '8px' }}><span className="text-xl">{'\u25C8'}</span> Tasks</span>
                 <button onClick={() => navigate('/tasks')} className="text-xs text-gray-400 hover:text-white transition-colors">View all →</button>
               </h2>
               {recentTasks.length > 0 ? (
@@ -197,7 +316,7 @@ export default function DashboardPage() {
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}>
             <GlassCard glowColor="#00f5a0" padding="20px">
               <h2 className="text-lg font-semibold text-neon-green flex items-center justify-between" style={{ marginBottom: '16px' }}>
-                <span className="flex items-center" style={{ gap: '8px' }}><span className="text-xl">◎</span> Events</span>
+                <span className="flex items-center" style={{ gap: '8px' }}><span className="text-xl">{'\u25CE'}</span> Events</span>
                 <button onClick={() => navigate('/events')} className="text-xs text-gray-400 hover:text-white transition-colors">View all →</button>
               </h2>
               {recentEvents.length > 0 ? (

@@ -215,6 +215,36 @@ export interface MonitorEvent {
   fix_sprint_id: number | null
 }
 
+// Gen4 types
+export interface Gen4Dashboard {
+  enabled: boolean
+  experiments: Record<string, boolean>
+  recent_activity: Array<{ type: string; detail: string; created_at: string }>
+  genome_fitness_trend: Array<{ id: number; fitness: number; wins: number; losses: number; generation: number }>
+  active_interventions: Array<{ id: number; trigger_pattern: string; task_id: number; intervention: string; context: Record<string, unknown>; created_at: string }>
+}
+
+export interface Gen4Genome {
+  id: number
+  genome: Record<string, string>
+  fitness: number
+  wins: number
+  losses: number
+  generation: number
+  is_elite: number
+  parent_ids: number[]
+  created_at: string
+  last_used_at: string | null
+}
+
+export interface Gen4Prediction {
+  project: string
+  recommended_model: string
+  recommended_mode: string
+  confidence: number
+  reasoning: string[]
+}
+
 // API functions
 export const api = {
   health: () => request<{ status: string }>('/health'),
@@ -308,4 +338,17 @@ export const api = {
   }>) => request<{ imported: number; ids: number[] }>('/import', {
     method: 'POST', body: JSON.stringify({ tasks }),
   }),
+
+  gen4: {
+    dashboard: () => request<Gen4Dashboard>('/gen4/dashboard'),
+    metrics: () => request<Record<string, unknown>>('/gen4/metrics'),
+    genomes: () => request<{ genomes: Gen4Genome[] }>('/gen4/genomes'),
+    predict: (project: string) => request<Gen4Prediction>(`/gen4/predict/${project}`),
+    config: () => request<Record<string, unknown>>('/gen4/config'),
+    projectConfig: (project: string) => request<{ project: string; experiments: Record<string, boolean> }>(`/gen4/projects/${project}`),
+  },
+
+  terminals: {
+    poolStatus: () => request<{ pool_size: number; max_size: number; in_use: number; idle: number; active_sessions: number }>('/terminals/pool'),
+  },
 }

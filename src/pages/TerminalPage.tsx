@@ -36,18 +36,20 @@ const STATE_LABELS: Record<string, string> = {
 }
 
 const PROJECTS = [
+  { name: 'ReactCRM', dir: '~/ReactCRM', backend: '~/react-crm-api', prod: 'https://react.ecbtx.com' },
+  { name: 'SOCDashboard', dir: '~/security-stack/soc-dashboard', backend: '', prod: '' },
   { name: 'BreweryCRM', dir: '~/BreweryCRM', backend: '~/bearded-hop-api', prod: 'https://bearded-hop-frontend-production.up.railway.app' },
   { name: 'LandscapeCRM', dir: '~/LandscapeCRM', backend: '~/landscape-crm-api', prod: '' },
   { name: 'CrownHardware', dir: '~/CrownHardware', backend: '~/CrownHardware/backend', prod: '' },
-  { name: 'ReactCRM', dir: '~/ReactCRM', backend: '~/react-crm-api', prod: 'https://react.ecbtx.com' },
   { name: 'PeakDipVibe', dir: '~/PeakDipVibe', backend: '', prod: '' },
 ]
 
 const COMPETITORS: Record<string, string[]> = {
+  ReactCRM: ['ServiceTitan (AI dispatch, pricebook management, real-time GPS)', 'Housecall Pro (online booking, automated follow-ups, review requests)', 'FieldEdge (QuickBooks sync, flat-rate pricing, performance dashboards)', 'Workiz (AI call answering, lead scoring, two-way SMS)', 'Service Fusion (estimate-to-invoice pipeline, fleet GPS, customer portal)'],
+  SOCDashboard: ['Splunk SOAR (automated playbooks, 300+ integrations, case management)', 'IBM QRadar (AI threat detection, UEBA, network flow analysis)', 'Microsoft Sentinel (cloud-native SIEM, MITRE ATT&CK mapping, automated investigation)', 'Elastic Security (unified SIEM + endpoint, ML anomaly detection, osquery)', 'Wazuh (open-source XDR, file integrity monitoring, vulnerability detection)'],
   BreweryCRM: ['Ekos (grain-to-glass tracking, TTB compliance)', 'Ollie (taproom POS, keg tracking, distributor portal)', 'Breww (real-time tank monitoring, automated batch costing)', 'Arryved (mobile ordering, tab management, event ticketing)', 'Untappd for Business (menu publishing, customer ratings, social integration)'],
   LandscapeCRM: ['Jobber (one-click rebooking, automated invoicing, client hub)', 'ServiceTitan (GPS fleet tracking, real-time dispatch, customer ETA texts)', 'LMN (crew time tracking, job costing, budget vs actual)', 'Aspire (proposal builder, route optimization, chemical tracking)', 'SingleOps (drag-and-drop scheduling, photo documentation, recurring services)'],
   CrownHardware: ['Fishbowl (manufacturing BOM, work orders, inventory forecasting)', 'Katana (visual production planning, batch tracking, live floor control)', 'MRPeasy (capacity planning, quality control, shipping integration)', 'JobBOSS (quoting, shop floor data collection, tool tracking)', 'Odoo Manufacturing (PLM, quality alerts, maintenance scheduling)'],
-  ReactCRM: ['ServiceTitan (AI dispatch, pricebook management, real-time GPS)', 'Housecall Pro (online booking, automated follow-ups, review requests)', 'FieldEdge (QuickBooks sync, flat-rate pricing, performance dashboards)', 'Workiz (AI call answering, lead scoring, two-way SMS)', 'Service Fusion (estimate-to-invoice pipeline, fleet GPS, customer portal)'],
   PeakDipVibe: ['TradingView (advanced charting, Pine Script alerts, social trading ideas)', 'Thinkorswim (real-time scanners, thinkScript backtesting, options analytics)', 'Trade Ideas (AI-powered scanner, Holly AI bot, simulated trading)', 'Finviz (visual stock screener, heatmaps, insider trading tracker)', 'StockCharts (technical scan workbench, breadth indicators, sector rotation)'],
 }
 
@@ -214,6 +216,133 @@ Iterate up to 30 times on failures.`
     launchWithPrompt(project, 'pipeline', prompt)
   }
 
+  const launchPerformanceSprint = (project: typeof PROJECTS[0]) => {
+    const prompt = `You are a senior performance engineer auditing ${project.name}. Your goal is to make this app FAST — sub-second page loads, smooth 60fps animations, minimal bundle size.
+
+PRODUCTION: ${project.prod || 'localhost:5173'}
+
+═══════════════════════════════════════════
+PHASE 1 — PERFORMANCE AUDIT
+═══════════════════════════════════════════
+Use Playwright to measure performance on every page:
+- Time each page navigation (goto + domcontentloaded)
+- Count network requests per page
+- Check for: large images, unoptimized assets, render-blocking scripts
+- Look at bundle size — run \`npm run build\` and check the output
+- Identify the 3 slowest pages and the root cause of each
+
+═══════════════════════════════════════════
+PHASE 2 — OPTIMIZE (fix the top 5 issues)
+═══════════════════════════════════════════
+Common fixes to apply:
+- Add React.lazy() and Suspense for route-level code splitting
+- Add loading="lazy" to images
+- Replace heavy imports with lighter alternatives
+- Add useMemo/useCallback where re-renders are excessive
+- Optimize API calls — remove N+1 queries, add pagination
+- Add skeleton loaders for perceived performance
+
+═══════════════════════════════════════════
+PHASE 3 — VERIFY
+═══════════════════════════════════════════
+Re-run Playwright timing on every page. Compare before/after.
+Target: every page loads in under 2 seconds on localhost.
+Push to GitHub. Iterate up to 15 times on failures.`
+    launchWithPrompt(project, 'perf', prompt)
+  }
+
+  const launchSecuritySprint = (project: typeof PROJECTS[0]) => {
+    const prompt = `You are a security engineer doing a thorough security audit of ${project.name}. Find and fix vulnerabilities before attackers do.
+
+PRODUCTION: ${project.prod || 'localhost:5173'}
+
+═══════════════════════════════════════════
+PHASE 1 — SECURITY SCAN
+═══════════════════════════════════════════
+Use Playwright and code review to check for:
+
+FRONTEND:
+- XSS: Any user input rendered with dangerouslySetInnerHTML or without sanitization
+- Open redirects: URL parameters used in navigation without validation
+- Sensitive data in localStorage/sessionStorage (tokens, passwords, PII)
+- Console logging sensitive data in production
+- CORS misconfigurations
+
+BACKEND (if applicable):
+- SQL injection in any raw queries
+- Missing input validation on API endpoints
+- Missing auth checks on protected routes
+- Hardcoded secrets or API keys in source code
+- Missing rate limiting on auth endpoints
+- File upload without type/size validation
+
+DEPENDENCIES:
+- Run \`npm audit\` and check for critical/high vulnerabilities
+- Check for outdated packages with known CVEs
+
+═══════════════════════════════════════════
+PHASE 2 — FIX ALL FINDINGS
+═══════════════════════════════════════════
+For each vulnerability:
+1. Fix the root cause (not just a band-aid)
+2. Add a test that would catch the regression
+3. Verify the fix with Playwright
+
+═══════════════════════════════════════════
+PHASE 3 — VERIFY
+═══════════════════════════════════════════
+Re-run all checks. Confirm zero high/critical findings.
+Run \`npm audit\` and confirm clean or only low-severity.
+Push to GitHub.`
+    launchWithPrompt(project, 'security', prompt)
+  }
+
+  const launchMobileSprint = (project: typeof PROJECTS[0]) => {
+    const prompt = `You are a mobile-first UI/UX expert auditing ${project.name} for mobile responsiveness. Every feature must work perfectly on phone screens.
+
+PRODUCTION: ${project.prod || 'localhost:5173'}
+
+═══════════════════════════════════════════
+PHASE 1 — MOBILE AUDIT (use Playwright with mobile viewport)
+═══════════════════════════════════════════
+Set viewport to iPhone 14 (390x844) and test EVERY page:
+
+await page.setViewportSize({ width: 390, height: 844 });
+
+On each page check:
+- Does content overflow horizontally? (horizontal scrollbar = broken)
+- Are touch targets at least 44x44px? (tiny buttons = unusable)
+- Do tables collapse or scroll properly?
+- Do modals/dropdowns fit on screen?
+- Does the navigation menu work? (hamburger menu, slide-out, etc.)
+- Are fonts readable without zooming? (minimum 14px body text)
+- Do charts/graphs resize or become unreadable?
+
+Create a ranked list: TOP 5 worst mobile issues.
+
+═══════════════════════════════════════════
+PHASE 2 — FIX ALL 5 ISSUES
+═══════════════════════════════════════════
+For each issue:
+- Use responsive Tailwind classes (sm:, md:, lg:)
+- Stack columns vertically on mobile (grid-cols-1 → sm:grid-cols-2)
+- Replace horizontal tables with card layouts on mobile
+- Make sure touch targets are large enough
+- Add proper overflow handling (overflow-x-auto on tables)
+
+═══════════════════════════════════════════
+PHASE 3 — VERIFY ON 3 VIEWPORTS
+═══════════════════════════════════════════
+Test every page at:
+1. iPhone 14 (390x844)
+2. iPad (768x1024)
+3. Desktop (1280x800)
+
+All pages must be fully functional at all 3 sizes.
+Push to GitHub. Iterate up to 20 times on failures.`
+    launchWithPrompt(project, 'mobile', prompt)
+  }
+
   return (
     <PageTransition>
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1rem 2rem', display: 'flex', flexDirection: 'column', gap: '12px', height: 'calc(100vh - 80px)' }}>
@@ -282,6 +411,27 @@ Iterate up to 30 times on failures.`
                     >
                       Full Pipeline
                     </button>
+                    <button
+                      onClick={() => launchPerformanceSprint(project)}
+                      className="text-xs rounded-full bg-[#eab308]/10 text-[#eab308] hover:bg-[#eab308]/20 border border-[#eab308]/30 transition-all"
+                      style={{ padding: '3px 8px' }}
+                    >
+                      Performance
+                    </button>
+                    <button
+                      onClick={() => launchSecuritySprint(project)}
+                      className="text-xs rounded-full bg-[#ef4444]/10 text-[#ef4444] hover:bg-[#ef4444]/20 border border-[#ef4444]/30 transition-all"
+                      style={{ padding: '3px 8px' }}
+                    >
+                      Security
+                    </button>
+                    <button
+                      onClick={() => launchMobileSprint(project)}
+                      className="text-xs rounded-full bg-[#00d4ff]/10 text-[#00d4ff] hover:bg-[#00d4ff]/20 border border-[#00d4ff]/30 transition-all"
+                      style={{ padding: '3px 8px' }}
+                    >
+                      Mobile
+                    </button>
                   </div>
                 </div>
               ))}
@@ -294,7 +444,7 @@ Iterate up to 30 times on failures.`
           {terminals.map((t) => {
             const status = statuses[t.id]
             return (
-            <GlassCard key={t.id} glowColor={t.label.startsWith('vision') ? '#a855f7' : t.label.startsWith('pipeline') ? '#ff006e' : t.label.startsWith('qa') ? '#00f5a0' : t.command ? '#00d2ff' : '#00f5a0'} padding="0">
+            <GlassCard key={t.id} glowColor={t.label.startsWith('vision') ? '#a855f7' : t.label.startsWith('pipeline') ? '#ff006e' : t.label.startsWith('qa') ? '#00f5a0' : t.label.startsWith('perf') ? '#eab308' : t.label.startsWith('security') ? '#ef4444' : t.label.startsWith('mobile') ? '#00d4ff' : t.command ? '#00d2ff' : '#00f5a0'} padding="0">
               <div className="flex items-center justify-between" style={{ padding: '5px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <div className="flex items-center" style={{ gap: '8px' }}>
                   <span className={`text-xs font-mono ${t.command ? 'text-neon-purple' : 'text-gray-400'}`}>
