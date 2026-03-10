@@ -43,6 +43,7 @@ const PROJECTS = [
   { name: 'CrownHardware', dir: '~/CrownHardware', backend: '~/CrownHardware/backend', prod: '' },
   { name: 'PeakDipVibe', dir: '~/PeakDipVibe', backend: '', prod: '' },
   { name: 'DrPhil', dir: '~/drphil', backend: '~/drphil', prod: 'https://drphil.ecbtx.com' },
+  { name: 'PermitAPI', dir: '~/permit-api', backend: '~/permit-api', prod: 'https://permits.ecbtx.com' },
 ]
 
 const COMPETITORS: Record<string, string[]> = {
@@ -53,6 +54,7 @@ const COMPETITORS: Record<string, string[]> = {
   CrownHardware: ['Fishbowl (manufacturing BOM, work orders, inventory forecasting)', 'Katana (visual production planning, batch tracking, live floor control)', 'MRPeasy (capacity planning, quality control, shipping integration)', 'JobBOSS (quoting, shop floor data collection, tool tracking)', 'Odoo Manufacturing (PLM, quality alerts, maintenance scheduling)'],
   PeakDipVibe: ['TradingView (advanced charting, Pine Script alerts, social trading ideas)', 'Thinkorswim (real-time scanners, thinkScript backtesting, options analytics)', 'Trade Ideas (AI-powered scanner, Holly AI bot, simulated trading)', 'Finviz (visual stock screener, heatmaps, insider trading tracker)', 'StockCharts (technical scan workbench, breadth indicators, sector rotation)'],
   DrPhil: ['Lasting (Gottman-method exercises, relationship health score, daily micro-lessons)', 'Paired (daily questions, love language assessments, date night ideas)', 'Relish (personalized coaching, interactive lessons, goal tracking)', 'Ours (pre-marriage courses, conflict resolution tools, conversation starters)', 'Love Nudge (5 Love Languages, love tank meter, nudge reminders)'],
+  PermitAPI: ['BuildZoom (permit search, contractor matching, project insights)', 'Shovels (building permit API, contractor analytics, developer-first)', 'BuildFax (property condition intelligence, insurance risk scoring)', 'Construction Monitor (real-time permit alerts, lead generation, project tracking)', 'PermitFlow (automated permit filing, jurisdiction rules engine, status tracking)'],
 }
 
 export default function TerminalPage() {
