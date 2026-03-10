@@ -42,6 +42,7 @@ const PROJECTS = [
   { name: 'LandscapeCRM', dir: '~/LandscapeCRM', backend: '~/landscape-crm-api', prod: '' },
   { name: 'CrownHardware', dir: '~/CrownHardware', backend: '~/CrownHardware/backend', prod: '' },
   { name: 'PeakDipVibe', dir: '~/PeakDipVibe', backend: '', prod: '' },
+  { name: 'DrPhil', dir: '~/drphil', backend: '~/drphil', prod: 'https://drphil.ecbtx.com' },
 ]
 
 const COMPETITORS: Record<string, string[]> = {
@@ -51,6 +52,7 @@ const COMPETITORS: Record<string, string[]> = {
   LandscapeCRM: ['Jobber (one-click rebooking, automated invoicing, client hub)', 'ServiceTitan (GPS fleet tracking, real-time dispatch, customer ETA texts)', 'LMN (crew time tracking, job costing, budget vs actual)', 'Aspire (proposal builder, route optimization, chemical tracking)', 'SingleOps (drag-and-drop scheduling, photo documentation, recurring services)'],
   CrownHardware: ['Fishbowl (manufacturing BOM, work orders, inventory forecasting)', 'Katana (visual production planning, batch tracking, live floor control)', 'MRPeasy (capacity planning, quality control, shipping integration)', 'JobBOSS (quoting, shop floor data collection, tool tracking)', 'Odoo Manufacturing (PLM, quality alerts, maintenance scheduling)'],
   PeakDipVibe: ['TradingView (advanced charting, Pine Script alerts, social trading ideas)', 'Thinkorswim (real-time scanners, thinkScript backtesting, options analytics)', 'Trade Ideas (AI-powered scanner, Holly AI bot, simulated trading)', 'Finviz (visual stock screener, heatmaps, insider trading tracker)', 'StockCharts (technical scan workbench, breadth indicators, sector rotation)'],
+  DrPhil: ['Lasting (Gottman-method exercises, relationship health score, daily micro-lessons)', 'Paired (daily questions, love language assessments, date night ideas)', 'Relish (personalized coaching, interactive lessons, goal tracking)', 'Ours (pre-marriage courses, conflict resolution tools, conversation starters)', 'Love Nudge (5 Love Languages, love tank meter, nudge reminders)'],
 }
 
 export default function TerminalPage() {
