@@ -156,13 +156,32 @@ export interface SprintEntry {
   tty: string
   cwd: string
   prompt: string
-  status: 'running' | 'completed' | 'failed'
+  status: 'running' | 'completed' | 'failed' | 'build_failed'
   output_path: string
   output_size: number
   output_tail: string
   started_at: string
   completed_at: string | null
   source: string
+  cost_usd: number
+  verification_result: string | null
+}
+
+export interface CostSummary {
+  today: { total_usd: number; count: number }
+  week: { total_usd: number; count: number }
+  month: { total_usd: number; count: number }
+  by_project: Array<{ project: string; total_usd: number; count: number; successes: number; failures: number }>
+  daily_budget_usd: number
+  circuit_breaker_tripped: boolean
+  budget_usage_pct: number
+}
+
+export interface CostTrend {
+  day: string
+  total_usd: number
+  count: number
+  successes: number
 }
 
 export interface MemoryEntry {
@@ -346,6 +365,16 @@ export const api = {
     predict: (project: string) => request<Gen4Prediction>(`/gen4/predict/${project}`),
     config: () => request<Record<string, unknown>>('/gen4/config'),
     projectConfig: (project: string) => request<{ project: string; experiments: Record<string, boolean> }>(`/gen4/projects/${project}`),
+    toggleExperiment: (key: string, enabled: boolean) =>
+      request<{ key: string; value: unknown }>('/gen4/config', { method: 'PUT', body: JSON.stringify({ key, value: JSON.stringify(enabled) }) }),
+    resetDefaults: () => request<{ status: string; defaults: Record<string, unknown> }>('/gen4/reset-defaults', { method: 'POST' }),
+    toggleProjectExperiment: (project: string, experiment: string, enabled: boolean) =>
+      request<{ project: string; experiment: string; enabled: boolean }>(`/gen4/projects/${project}`, { method: 'PUT', body: JSON.stringify({ experiment, enabled }) }),
+  },
+
+  costs: {
+    summary: () => request<CostSummary>('/costs/summary'),
+    trend: () => request<CostTrend[]>('/costs/trend'),
   },
 
   terminals: {
