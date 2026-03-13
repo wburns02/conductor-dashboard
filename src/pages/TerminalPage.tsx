@@ -44,6 +44,7 @@ const PROJECTS = [
   { name: 'PeakDipVibe', dir: '~/PeakDipVibe', backend: '', prod: '' },
   { name: 'DrPhil', dir: '~/drphil', backend: '~/drphil', prod: 'https://drphil.ecbtx.com' },
   { name: 'PermitAPI', dir: '~/permit-api', backend: '~/permit-api', prod: 'https://permits.ecbtx.com' },
+  { name: 'NurseStation', dir: '~/NurseStation', backend: '~/nursestation-api', prod: '' },
 ]
 
 const COMPETITORS: Record<string, string[]> = {
@@ -55,6 +56,7 @@ const COMPETITORS: Record<string, string[]> = {
   PeakDipVibe: ['TradingView (advanced charting, Pine Script alerts, social trading ideas)', 'Thinkorswim (real-time scanners, thinkScript backtesting, options analytics)', 'Trade Ideas (AI-powered scanner, Holly AI bot, simulated trading)', 'Finviz (visual stock screener, heatmaps, insider trading tracker)', 'StockCharts (technical scan workbench, breadth indicators, sector rotation)'],
   DrPhil: ['Lasting (Gottman-method exercises, relationship health score, daily micro-lessons)', 'Paired (daily questions, love language assessments, date night ideas)', 'Relish (personalized coaching, interactive lessons, goal tracking)', 'Ours (pre-marriage courses, conflict resolution tools, conversation starters)', 'Love Nudge (5 Love Languages, love tank meter, nudge reminders)'],
   PermitAPI: ['BuildZoom (permit search, contractor matching, project insights)', 'Shovels (building permit API, contractor analytics, developer-first)', 'BuildFax (property condition intelligence, insurance risk scoring)', 'Construction Monitor (real-time permit alerts, lead generation, project tracking)', 'PermitFlow (automated permit filing, jurisdiction rules engine, status tracking)'],
+  NurseStation: ['ShiftMed (on-demand nurse staffing marketplace, credential verification, real-time shift matching)', 'NurseGrid (nurse-centric scheduling, shift swaps, credential tracking, unit communication)', 'Connecteam (healthcare shift scheduling, GPS time clock, compliance training, HIPAA messaging)', 'QGenda (physician and nurse scheduling optimization, rules-based auto-scheduling, fatigue management)', 'Staffingly (AI-powered healthcare staffing, predictive demand forecasting, float pool management)'],
 }
 
 export default function TerminalPage() {
