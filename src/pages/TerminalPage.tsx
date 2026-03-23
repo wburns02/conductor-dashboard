@@ -44,6 +44,7 @@ const PROJECTS = [
   { name: 'PeakDipVibe', dir: '~/PeakDipVibe', backend: '', prod: '' },
   { name: 'DrPhil', dir: '~/drphil', backend: '~/drphil', prod: 'https://drphil.ecbtx.com' },
   { name: 'ClaudeBall', dir: '~/ClaudeBall', backend: '', prod: '' },
+  { name: 'ClaudeBallGFX', dir: '~/ClaudeBall', backend: '', prod: '' },
   { name: 'PermitAPI', dir: '~/permit-api', backend: '~/permit-api', prod: 'https://permits.ecbtx.com' },
   { name: 'NurseStation', dir: '~/NurseStation', backend: '~/nursestation-api', prod: 'https://opus46-production.up.railway.app' },
 ]
@@ -59,6 +60,7 @@ const COMPETITORS: Record<string, string[]> = {
   PermitAPI: ['BuildZoom (permit search, contractor matching, project insights)', 'Shovels (building permit API, contractor analytics, developer-first)', 'BuildFax (property condition intelligence, insurance risk scoring)', 'Construction Monitor (real-time permit alerts, lead generation, project tracking)', 'PermitFlow (automated permit filing, jurisdiction rules engine, status tracking)'],
   NurseStation: ['ShiftMed (on-demand nurse staffing marketplace, credential verification, real-time shift matching)', 'NurseGrid (nurse-centric scheduling, shift swaps, credential tracking, unit communication)', 'Connecteam (healthcare shift scheduling, GPS time clock, compliance training, HIPAA messaging)', 'QGenda (physician and nurse scheduling optimization, rules-based auto-scheduling, fatigue management)', 'Staffingly (AI-powered healthcare staffing, predictive demand forecasting, float pool management)'],
   ClaudeBall: ['OOTP Baseball (deep statistical sim, full minor leagues, historical replay, draft scouting with tools/grades)', 'Baseball Mogul (simplified franchise management, financial modeling, quick sim, auto-play)', 'Diamond Mind Baseball (tabletop-style replay engine, historical seasons, Strat-O-Matic alternative)', 'MLB The Show Franchise (console sim, player development, trade logic, scouting reports)', 'Pennant Fever (browser-based baseball management, league play, prospect development)'],
+  ClaudeBallGFX: ['Ken Griffey Jr. Winning Run (SNES 16-bit sprites, fluid batting/pitching animations, Mode 7 scaling, expressive player reactions)', 'Tony Hawk Pro Skater 2 (chunky character sprites, smooth frame interpolation, dynamic camera, hand-crafted pixel art)', 'Super Mega Baseball 3 (stylized 3D characters, exaggerated animations, satisfying bat-crack effects, cinematic home runs)', 'Blaseball (surreal web-based baseball, unique visual identity, cult following through aesthetic)', 'Retro Bowl (pixel-art sports sim, buttery 60fps gameplay, tactile controls, mobile-first design that feels premium)'],
 }
 
 export default function TerminalPage() {
@@ -396,7 +398,7 @@ Push to GitHub. Iterate up to 20 times on failures.`
             <div className="text-xs text-neon-purple font-semibold" style={{ marginBottom: '8px' }}>
               Launch Vibe Loop — pick a project and sprint type
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', maxHeight: '340px', overflowY: 'auto' }}>
               {PROJECTS.map((project) => (
                 <div key={project.name} className="rounded-lg border border-white/[0.08] bg-white/[0.02]" style={{ padding: '10px 14px', minWidth: '200px' }}>
                   <div className="text-sm text-white font-semibold">{project.name}</div>
