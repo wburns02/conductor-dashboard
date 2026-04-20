@@ -32,6 +32,12 @@ function stripAnsi(str: string): string {
 }
 
 function getWsBase(): string {
+  const apiUrl = import.meta.env.VITE_API_URL
+  if (apiUrl) {
+    // VITE_API_URL is like "https://conductor-api.ecbtx.com/api" — strip /api suffix, swap protocol
+    const base = apiUrl.replace(/\/api\/?$/, '')
+    return base.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:')
+  }
   if (typeof window !== 'undefined') {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
